@@ -1,5 +1,5 @@
 #Name of the executable
-NAME = Bureaucrat
+NAME = ScalarConverter
 
 #Compiler to use
 CC = c++
@@ -22,7 +22,7 @@ UP			=	\033[A
 CUT			=	\033[K
 
 #source and object files
-SRC_FILES = main.cpp Bureaucrat.cpp
+SRC_FILES = main.cpp ScalarConverter.cpp
 
 OBJ_FILES = $(SRC_FILES:.cpp=.o)
 
