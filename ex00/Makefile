@@ -1,5 +1,5 @@
 #Name of the executable
-NAME = ScalarConverter
+NAME = convert
 
 #Compiler to use
 CC = c++
