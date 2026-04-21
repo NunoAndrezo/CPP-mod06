@@ -6,17 +6,22 @@
 /*   By: nuno <nuno@student.42.fr>                  +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/07 12:21:45 by nuno              #+#    #+#             */
-/*   Updated: 2026/04/09 21:26:11 by nuno             ###   ########.fr       */
+/*   Updated: 2026/04/21 13:40:56 by nuno             ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "../inc/ScalarConverter.hpp"
+
+#include <cerrno>
+#include <cstdlib>
+#include <iomanip>
 
 static int handlePseudo(std::string s);
 static int handleDouble(std::string s);
 static int handleFloat(std::string s);
 static int handleInt(std::string s);
 static int handleChar(std::string s);
+static void printAll(double valueForCharInt, double valueForDouble, bool floatPossible, float valueForFloat);
 
 //ScalarConverter::ScalarConveter() {} // the default constructor is private, so it cannot be called from outside the class. This is a common technique to prevent instantiation of a class that is meant to be used only for its static members.	
 
@@ -27,16 +32,33 @@ ScalarConverter::~ScalarConverter()
 
 void ScalarConverter::convert(std::string string)
 {
-	if (handlePseudo(string) == 1)
-		return ;
-	else if (handleChar(string))
-		return ;
-	else if (handleFloat(string))
-		return ;
-	else if (handleDouble(string))
-		return ;
-	else if (handleInt(string))
-		return ;
+	if (handlePseudo(string)) // nan, inf, -inf, +inf and their float variants.
+		return;
+	if (string.length() == 1 && std::isdigit(static_cast<unsigned char>(string[0])) == 0) // we double check this inside handleChar, but we can save some time by checking it here first.
+	{
+		handleChar(string); // if it's a single non-digit character, we can directly handle it as a char without trying to parse it as a number. This is an optimization that allows us to skip unnecessary parsing steps for this specific case.
+		return;
+	}
+	if (string.length() >= 2)
+	{
+		const char last = string[string.length() - 1];
+		if (last == 'f' || last == 'F')
+		{
+			if (handleFloat(string))
+				return;
+			std::cerr << "Invalid input\n";
+			return;
+		}
+	}
+	if (string.find('.') != std::string::npos)
+	{
+		if (handleDouble(string))
+			return;
+		std::cerr << "Invalid input\n";
+		return;
+	}
+	if (handleInt(string))
+		return;
 	std::cerr << "Invalid input\n";
 }
 
@@ -67,114 +89,19 @@ static int handleChar(std::string s)
 {
 	if (s.length() == 1 && isdigit(s[0]) == 0)
 	{
-		if (static_cast<int>(s[0]) >= 32 && static_cast<int>(s[0]) <= 126)
-		{
-			std::cout << "char: '" << s[0] << "'\n";
-			std::cout << "int: " << static_cast<int>(s[0]) << std::endl;
-			std::cout << "float: " << static_cast<float>(s[0]) << ".0f\n";
-			std::cout << "double: " << static_cast<double>(s[0]) << ".0\n";
-			return (1);
-		}
+		const int code = static_cast<unsigned char>(s[0]);
+		if (code < 32 || code > 126)
+			std::cout << "char: Non displayable" << std::endl;
 		else
-			return (0);
+			std::cout << "char: '" << s[0] << "'" << std::endl;
+		std::cout << "int: " << code << std::endl;
+		std::cout << std::fixed << std::setprecision(1); // Set fixed-point notation and precision to 1 for float and double output
+		std::cout << "float: " << static_cast<float>(code) << "f" << std::endl;
+		std::cout << "double: " << static_cast<double>(code) << std::endl;
+		std::cout.unsetf(std::ios::fixed); // Unset fixed-point notation for any future output. No need to reset precision as it will be set explicitly in other handlers.
+		return (1);
 	}
 	return (0);
-}
-
-static int handleFloat(std::string s)
-{
-	size_t	i = 0;
-	bool	dot_flag = false;
-	int		sign = 1;
-	float	number = 0.0f;
-	float	decimal_num = 1.0f;
-	// maybe I will use stringstream to handle the conversion, is that allowed?
-	//s.length() <= 2 because we need at least one digit, a dot, and an 'f' at the end. so the minimum length is 3 for a valid float like "0.f".
-	if (s.length() <= 2 || (s[s.length() - 1] != 'f' && s[s.length() - 1] != 'F') || s.find('.') == std::string::npos)
-		return 0;
-	while(i < s.length() - 1)
-	{
-		// example- real number: 1234.45f.
-		// first round - s[0] is '1', so number = 0 * 10 + (1 - '0') = 1, i = 1
-		// second round - s[1] is '2', so number = 1 * 10 + (2 - '0') = 12, i = 2
-		// third round - s[2] is '3', so number = 12 * 10 + (3 - '0') = 123, i = 3
-		// fourth round - s[3] is '4', so number = 123 * 10 + (4 - '0') = 1234, i = 4
-		// fifth round - s[4] is '.', so we set dot_flag to true, and we start processing the decimal part! decimal_num
-		// sixth round - s[5] is '4', so decimal_num = 1 * 10 = 10, number = 1234 * 10 + (4 - '0') = 12344, i = 6
-		// seventh round - s[6] is '5', so decimal_num = 10 * 10 = 100, number = 12344 * 10 + (5 - '0') = 123445, i = 7
-		// eighth round - s[7] is 'f', so we exit the loop and we will divide number by decimal_num to get the final float value, which is 123445 / 100 = 1234.45f
-		if (s[0] == '-' || s[0] == '+')
-			sign = (s[0] == '-') ? -1 : 1, i++;
-		else if (isdigit(s[i]))
-			number = number * 10 + (s[i] - '0'), i++;
-		else if (s[i] == '.' && dot_flag == false)
-		{
-			dot_flag = true;
-			for (size_t j = i + 1; j < s.length() - 1; j++) // so here in the fifth round: j starts at 5, and it will check if s[5] is a digit, which is '4', so it will multiply decimal_num by 10, making it 10. then j will be 6, and it will check if s[6] is a digit, which is '5', so it will multiply decimal_num by 10 again, making it 100. then j will be 7, and it will check if s[7] is a digit, which is 'f', so it will return 0 because it's not a digit.
-				if (isdigit(s[j]))
-					decimal_num *= 10; // so decimal_num will be 100 after the loop.
-				else
-					return 0;
-			i++;
-		}
-		else
-			return 0;
-	}
-	std::cout << "number: " << number << std::endl; // this is just for debugging, I will remove it later.
-	std::cout << "decimal_num: " << decimal_num << std::endl; // this is just for debugging, I will remove it later.
-	number /= decimal_num; // here we divide the number by the decimal_num to get the final float value. so in our example, number is 123445, and decimal_num is 100, so number / decimal_num is 1234.45f, which is the correct float representation of the input string "1234.45f".
-	number *= sign;
-	if (number > 340282346638528859811704183484516925440.0000000000000000  || number < -340282346638528859811704183484516925440.0000000000000000)
-		return (std::cerr << "Error: float overflow\n" << std::endl, 0);
-	// char
-	if ((number  < 32 || number > 126) || number != static_cast<int>(number)) // how to make sure 45.9 doesn't pass the char case? Answer: You can check if the number is an integer and if it falls within the range of displayable ASCII characters. For example, you can add a condition to check if the number is a whole number (i.e., has no decimal part) and if it is between 32 and 126 inclusive. Here's how you can modify the condition:
-		std::cout << "char: Non displayable\n";
-	else
-		std::cout << "char: " << static_cast<char>(number) << std::endl;
-	// int
-	if (static_cast<long>(number) > 2147483647 || static_cast<long>(number) < -2147483648 || number != static_cast<int>(number))
-		std::cout << "int: impossible\n";
-	else
-		std::cout << "int: " << static_cast<int>(number) << std::endl;
-	// float and double
-	std::cout << "float: " << (number) << "f" << std::endl;
-	std::cout << "double: " << (number) << std::endl;
-	return 1;
-}
-
-static int handleDouble(std::string s)
-{
-	// maybe I will use stringstream here since I didn't use for Float
-	// or I could just copy the code from handleFloat and just remove the 'f' at the end and change the type to double.
-	std::stringstream ss(s);
-	double number;
-	ss >> number; // what this does is: it tries to extract a double value from the stringstream ss and store it in the variable number. if the extraction is successful, it will return true, and if it fails (for example, if the string does not contain a valid double), it will return false. so if ss.fail() is true, it means that the extraction failed, and we should return 0 to indicate that this function cannot handle the input string as a double. also, we check if ss.eof() is true to ensure that we have reached the end of the string after extracting the double value. if there are extra characters after the number, it would also be considered an invalid input for a double.
-	// how does >> operator work with stringstream? Answer: The >> operator is overloaded for stringstream to extract formatted data from the stream. When you use ss >> number, it tries to read characters from the stringstream ss and convert them into a double value, which is then stored in the variable number. The operator will skip any leading whitespace characters and then read characters until it encounters a character that cannot be part of a valid double (such as a letter or a symbol). If the extraction is successful, it will set the failbit to false, and if it fails, it will set the failbit to true. Additionally, if there are extra characters after the number that are not part of a valid double, it will not consume those characters, and ss.eof() will return false, indicating that we have not reached the end of the string.
-	if (ss.fail() || !ss.eof())
-		return 0;
-	// example: number is 43.89
-	// round 1: char: 43.89 is not a displayable character, so it will print "char: Non displayable"
-	// round 2: int: 43.89 is not an integer, so it will print "int: impossible"
-	// round 3: float: 43.89f
-	// round 4: double: 43.89
-	
-	if (number > 1.7e+308 || number < -1.7)
-		return (std::cerr << "Error: double overflow\n" << std::endl, 0);
-	return 0;
-	// char
-	if (number < 32 || number > 126)
-		std::cout << "char: Non displayable\n";
-	else
-		std::cout << "char: " << static_cast<char>(number) << std::endl;
-	// int
-	if (number > std::numeric_limits<int>::max() || number < std::numeric_limits<int>::min())
-		std::cout << "int: impossible\n";
-	else
-		std::cout << "int: " << static_cast<int>(number) << std::endl;
-	// float and double
-	std::cout << "float: " << static_cast<float>(number) << "f" << std::endl;
-	std::cout << "double: " << (number) << std::endl;
-	return 1;
 }
 
 static int handleInt(std::string s)
@@ -185,14 +112,136 @@ static int handleInt(std::string s)
 	if (ss.fail() || !ss.eof())
 		return 0;
 	// char
-	if (number < 32 || number > 126)
-		std::cout << "char: Non displayable\n";
+	if (number < 0 || number > 127)
+		std::cout << "char: impossible" << std::endl;
+	else if (number < 32 || number > 126)
+		std::cout << "char: Non displayable" << std::endl;
 	else
-		std::cout << "char: " << static_cast<char>(number) << std::endl;
+		std::cout << "char: '" << static_cast<char>(number) << "'" << std::endl;
 	// int
 	std::cout << "int: " << number << std::endl;
 	// float and double
+	std::cout << std::fixed << std::setprecision(1);
 	std::cout << "float: " << static_cast<float>(number) << "f" << std::endl;
-	std::cout << "double: " << static_cast<double>(number) << std::endl; // do I need to add the .00 here? Answer: No, I don't need to add .00 here because when I cast an int to a double, it will automatically be represented as a floating-point number. For example, if number is 42, then static_cast<double>(number) will yield 42.0, which is the correct double representation of the integer 42. The output will show "double: 42" but it is understood that it is a double value. If you want to explicitly show the decimal part, you could use std::fixed and std::setprecision manipulators from the <iomanip> header to format the output, like this: std::cout << std::fixed << std::setprecision(2) << static_cast<double>(number) << std::endl; This would display the double value with two decimal places, showing "double: 42.00". However, for this project, it's not necessary to format the output in that way.
-	return 1;
+	std::cout << "double: " << static_cast<double>(number) << std::endl;
+	std::cout.unsetf(std::ios::fixed); // unsetf: unsets the specified formatting flags for the output stream. In this case, it unsets the fixed-point notation flag that was set earlier with std::fixed. This means that any subsequent floating-point output will not be forced to use fixed-point notation, and will instead use the default formatting based on the value being printed and the current precision settings. By calling unsetf after printing the float and double values, we ensure that any future floating-point output is not affected by the fixed-point formatting that we applied specifically for this output.
+	return (1);
+}
+
+static int handleFloat(std::string s)
+{
+	if (s.length() < 2)
+		return (0);
+	const char last = s[s.length() - 1]; // grab the last character.
+	if (last != 'f' && last != 'F')
+		return (0);
+
+	const std::string core = s.substr(0, s.length() - 1); // core is the part of the string without the trailing 'f' or 'F'.
+	errno = 0; // reset errno by setting it to 0 before calling strtod to ensure that we can accurately detect if an overflow or underflow occurred during the conversion. If strtod encounters a value that is too large or too small to be represented as a double, it will set errno to ERANGE. By resetting errno to 0 beforehand, we can check its value after the call to strtod to determine if an error occurred.
+	char *end = 0; // check explanation bellow
+	const double parsed = std::strtod(core.c_str(), &end); // parsed will be the double value. The end pointer is used to determine if the entire string was successfully parsed as a valid floating-point number. After calling strtod, end will point to the first character in the string that was not part of the valid number. If end points to the beginning of the string (core.c_str()), it means that no valid number was found. If end points to a character that is not the null terminator ('\0'), it means that there are extra characters after the valid number, which also indicates an invalid input. Therefore, we check if end is equal to core.c_str() or if *end is not '\0' to determine if the parsing was successful and if the input is valid.
+	if (end == core.c_str() || end == 0 || *end != '\0') // now we need end to point to the null terminator.
+		return (0);
+	if (errno == ERANGE)
+		return (0);
+	if (std::fabs(parsed) > static_cast<double>(std::numeric_limits<float>::max())) // if the absololute value of the parsed double is greater than the maximum representable float, then it's impossible to convert it to a float without overflow.
+	{
+		std::cout << "char: impossible" << std::endl;
+		std::cout << "int: impossible" << std::endl;
+		std::cout << "float: impossible" << std::endl;
+		std::cout << "double: impossible" << std::endl;
+		return (1);
+	}
+	else if (parsed != 0.0 && std::fabs(parsed) < static_cast<double>(std::numeric_limits<float>::min()))
+	{
+		std::cout << "char: impossible" << std::endl;
+		std::cout << "int: impossible" << std::endl;
+		std::cout << "float: impossible" << std::endl;
+		std::cout << "double: impossible" << std::endl;
+		return (1);
+	}
+
+	const float number = static_cast<float>(parsed);
+	const double d = static_cast<double>(number);
+	printAll(d, static_cast<double>(number), true, number);
+	return (1);
+}
+
+static int handleDouble(std::string s)
+{
+	if (s.find('.') == std::string::npos)
+		return (0);
+	if (s.length() > 1)
+	{
+		const char last = s[s.length() - 1];
+		if (last == 'f' || last == 'F')
+			return (0);
+	}
+
+	errno = 0;
+	char *end = 0;
+	const double number = std::strtod(s.c_str(), &end);
+	if (end == s.c_str() || end == 0 || *end != '\0')
+		return (0);
+	if (errno == ERANGE)
+		return (0);
+
+	const bool floatPossible = (std::fabs(number) <= static_cast<double>(std::numeric_limits<float>::max()));
+	printAll(number, number, floatPossible, static_cast<float>(number));
+	return (1);
+}
+
+static void printAll(double valueForCharInt, double valueForDouble, bool floatPossible, float valueForFloat)
+{
+	const bool isInt = (valueForCharInt == std::floor(valueForCharInt));
+
+	// char
+	if (!isInt || valueForCharInt < 0.0 || valueForCharInt > 127.0)
+		std::cout << "char: impossible" << std::endl;
+	else if (static_cast<int>(valueForCharInt) < 32 || static_cast<int>(valueForCharInt) > 126)
+		std::cout << "char: Non displayable" << std::endl;
+	else
+		std::cout << "char: '" << static_cast<char>(static_cast<int>(valueForCharInt)) << "'" << std::endl;
+
+	// int
+	if (!isInt || valueForCharInt > static_cast<double>(std::numeric_limits<int>::max())
+		|| valueForCharInt < static_cast<double>(std::numeric_limits<int>::min()))
+		std::cout << "int: impossible" << std::endl;
+	else
+		std::cout << "int: " << static_cast<int>(valueForCharInt) << std::endl;
+
+	// float
+	if (!floatPossible)
+		std::cout << "float: impossible" << std::endl;
+	else
+	{
+		std::ios::fmtflags oldFlags = std::cout.flags();
+		std::streamsize oldPrec = std::cout.precision();
+		if (isInt)
+			std::cout << std::fixed << std::setprecision(1);
+		else
+		{
+			const double absValue = std::fabs(valueForCharInt);
+			if (absValue != 0.0 && (absValue >= 1e6 || absValue < 1e-4))
+				std::cout << std::scientific << std::setprecision(5);
+			else
+				std::cout << std::setprecision(9);
+		}
+		std::cout << "float: " << valueForFloat << "f" << std::endl;
+		std::cout.flags(oldFlags);
+		std::cout.precision(oldPrec);
+	}
+
+	// double
+	{
+		std::ios::fmtflags oldFlags = std::cout.flags();
+		std::streamsize oldPrec = std::cout.precision();
+		if (isInt)
+			std::cout << std::fixed << std::setprecision(1);
+		else
+			std::cout << std::setprecision(15);
+		std::cout << "double: " << valueForDouble << std::endl;
+		std::cout.flags(oldFlags);
+		std::cout.precision(oldPrec);
+	}
 }
