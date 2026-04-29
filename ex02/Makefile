@@ -1,5 +1,5 @@
 #Name of the executable
-NAME = serializer
+NAME = identify
 
 #Compiler to use
 CC = c++
@@ -22,7 +22,7 @@ UP			=	\033[A
 CUT			=	\033[K
 
 #source and object files
-SRC_FILES = main.cpp Serializer.cpp
+SRC_FILES = main.cpp Base.cpp A.cpp B.cpp C.cpp
 
 OBJ_FILES = $(SRC_FILES:.cpp=.o)
 
