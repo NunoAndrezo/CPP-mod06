@@ -6,7 +6,7 @@
 /*   By: nuno <nuno@student.42.fr>                  +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/29 23:03:28 by nuno              #+#    #+#             */
-/*   Updated: 2026/04/29 23:58:56 by nuno             ###   ########.fr       */
+/*   Updated: 2026/05/01 13:17:55 by nuno             ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -25,7 +25,13 @@ void identify(Base &p); // cannot use a pointer inside this function!!!!!!
 
 int	main(int ac, char **av)
 {
+	if (ac != 1)
+	{
+		std::cerr << "Try the following: " << av[0] << std::endl;
+		return (1);
+	}
 	Base *bricky_bobby;
+
 	srand(time(NULL));
 	bricky_bobby = generate();
 	if (!bricky_bobby)
@@ -59,15 +65,37 @@ Base *generate(void)
 
 void identify(Base *p)
 {
+	std::cout << "Idenfify by pointer: " << std::endl;
 	if (dynamic_cast<A *>(p))
-		std::cout << "It's A :)" << std::endl;
+		std::cout << "It's A" << std::endl;
 	else if (dynamic_cast<B *>(p))
-		std::cout << "It's B :)" << std::endl;
+		std::cout << "It's B" << std::endl;
 	else if (dynamic_cast<C *>(p))
-		std::cout << "It's C :)" << std::endl;
+		std::cout << "It's C" << std::endl;
 }
 
 void identify(Base &p)
 {
-	
+	std::cout << "Idenfify by reference: " << std::endl;
+	try
+	{
+		A &a = dynamic_cast<A&>(p); // dynamic_cast already throws: std::bad_cast, if failed
+		(void)a;
+		std::cout << "Still A :)" << std::endl;
+	}
+	catch (std::exception &e) {}
+	try
+	{
+		B &b = dynamic_cast<B&>(p);
+		(void)b;
+		std::cout << "Still B :)" << std::endl;
+	}
+	catch (std::exception &e) {}
+	try
+	{
+		C &c = dynamic_cast<C&>(p);
+		(void)c;
+		std::cout << "Still C :)" << std::endl;
+	}
+	catch (std::exception &e) {}
 }
